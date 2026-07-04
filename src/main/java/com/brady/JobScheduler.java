@@ -110,17 +110,25 @@ public class JobScheduler {
 
         Runnable retryTask = () -> {
             try {
-                if (acceptingJobs.get()) {
-                    queue.add(job.nextAttempt());
+                synchronized (JobScheduler.this) {
+                    if (acceptingJobs.get()) {
+                        queue.add(job.nextAttempt());
+                    }
                 }
             } finally {
                 scheduledFutures.remove(futureRef.get());
             }
         };
 
-        ScheduledFuture<?> future = scheduledExecutor.schedule(retryTask, delay, TimeUnit.MILLISECONDS);
+        synchronized (this) {
+            if(!acceptingJobs.get()) {
+                return;
+            }
 
-        futureRef.set(future);
-        scheduledFutures.add(future);
+            ScheduledFuture<?> future = scheduledExecutor.schedule(retryTask, delay, TimeUnit.MILLISECONDS);
+
+            futureRef.set(future);
+            scheduledFutures.add(future);
+        }
     }
 }
